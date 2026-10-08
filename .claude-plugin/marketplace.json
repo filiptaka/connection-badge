@@ -1,0 +1,12 @@
+{
+  "name": "connection-badge",
+  "owner": { "name": "filiptaka", "url": "https://github.com/filiptaka" },
+  "description": "A Claude Code mod that shows whether the session runs locally or over SSH, and on which server",
+  "plugins": [
+    {
+      "name": "connection-badge",
+      "source": "./",
+      "description": "Shows in the prompt footer whether the session runs locally or over SSH, and on which server"
+    }
+  ]
+}

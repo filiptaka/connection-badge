@@ -1,0 +1,8 @@
+{
+  "name": "connection-badge",
+  "version": "0.1.0",
+  "description": "Shows in the prompt footer whether the session runs locally or over SSH, and on which server",
+  "author": { "name": "filiptaka", "url": "https://github.com/filiptaka" },
+  "repository": "https://github.com/filiptaka/connection-badge",
+  "types": "./types/index.d.ts"
+}
