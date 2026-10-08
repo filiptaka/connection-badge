@@ -23,7 +23,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // The footer's mode labels, at the right under the prompt (terminal and desktop).
+  // The footer under the prompt. The terminal draws the mode labels it is
+  // handed; the desktop app draws only a tree a hook returns.
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     const found = await read($, connection)
 
@@ -31,7 +32,15 @@ export const register: Register = on => {
       return next(e)
     }
 
-    return next({ ...e, props: { ...e.props, modes: [...e.props.modes, badge(found)] } })
+    const modes = [...e.props.modes, badge(found)]
+
+    if (e.surface === 'desktop') {
+      const { Text } = $.ui.resolve(e)
+
+      return <Text>{modes.join(' & ')}</Text>
+    }
+
+    return next({ ...e, props: { ...e.props, modes } })
   })
 
   on('command.run', { command: 'where' }, async $ => {

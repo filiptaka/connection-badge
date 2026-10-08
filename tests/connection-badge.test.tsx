@@ -10,9 +10,11 @@ type Machine = { name: string; hasProc?: boolean; osrelease?: string }
 
 // Everything beneath the plugin: the machine (its /proc files on Linux, the
 // `hostname` command elsewhere), the session, and the engine's footer, which
-// draws the mode labels it is handed. Answers which commands the plugin ran.
+// draws the mode labels it is handed. Answers which commands the plugin ran
+// and on which surfaces the engine's footer was asked to draw.
 function machine(on: On, { name, hasProc = true, osrelease = '6.8.0-45-generic' }: Machine) {
   const ran: string[][] = []
+  const engineDrew: string[] = []
 
   on('fs.read', ($, e) => {
     // The engine resolves the path first: run on Windows, /proc/... is C:\proc\...
@@ -38,20 +40,21 @@ function machine(on: On, { name, hasProc = true, osrelease = '6.8.0-45-generic' 
   on('session.cwd', () => ({ value: START.cwd }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('ui.render', { component: 'SessionMode' }, ($, e) => {
+    engineDrew.push(e.surface)
     const { Text } = $.ui.resolve(e)
 
     return <Text dimColor>{e.props.modes.join(' & ')}</Text>
   })
 
-  return ran
+  return { ran, engineDrew }
 }
 
-async function footer($: Engine, surface: (typeof SURFACES)[number]) {
+async function footer($: Engine, surface: (typeof SURFACES)[number], modes = ['focus']) {
   const ui = await $.ui.mount({
     plugin: PLUGIN,
     surface,
     component: 'SessionMode',
-    props: { modes: ['focus'] },
+    props: { modes },
   })
   const text = (await ui.find({ type: 'Text' }))?.text
   await ui.unmount()
@@ -65,13 +68,24 @@ test('an SSH session shows the user, server and its address', async ($, on) => {
     SSH_CLIENT: '203.0.113.9 51234 22',
     USER: 'deploy',
   })
-  const ran = machine(on, { name: 'web-01' })
+  const { ran, engineDrew } = machine(on, { name: 'web-01' })
   await $.session.start(START)
 
   for (const surface of SURFACES) {
     expect(await footer($, surface)).toBe('focus & ssh: deploy@web-01 (10.0.0.5)')
   }
   expect(ran).toEqual([])
+  // The desktop app shows only a tree a hook returns, never the engine's labels.
+  expect(engineDrew).toEqual(['terminal'])
+})
+
+test('the desktop app, which hands the footer no labels, gets the badge alone', async ($, on) => {
+  mock.env(on, { SSH_CONNECTION: '203.0.113.9 51234 10.0.0.5 22', USER: 'deploy' })
+  const { engineDrew } = machine(on, { name: 'web-01' })
+  await $.session.start(START)
+
+  expect(await footer($, 'desktop', [])).toBe('ssh: deploy@web-01 (10.0.0.5)')
+  expect(engineDrew).toEqual([])
 })
 
 test('a local Windows session shows the computer name', async ($, on) => {
@@ -86,7 +100,7 @@ test('a local Windows session shows the computer name', async ($, on) => {
 
 test('without /proc the hostname command names the machine', async ($, on) => {
   mock.env(on, { USER: 'alex' })
-  const ran = machine(on, { name: 'alex-macbook.local', hasProc: false })
+  const { ran } = machine(on, { name: 'alex-macbook.local', hasProc: false })
   await $.session.start(START)
 
   expect(await footer($, 'desktop')).toBe('focus & local: alex-macbook.local')
